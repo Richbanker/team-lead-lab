@@ -1,8 +1,14 @@
 # Team Lead Lab
 
-Илья Гажиенко ([`@Richbanker`](https://github.com/Richbanker)) ведёт проект как тимлид. Он определяет цель, ставит задачи, даёт обратную связь и принимает результат. GitHub Actions собирает сводку из текущих Issues и pull requests три раза в день.
+## Илья Гажиенко · тимлид
 
-[Поставить задачу](https://github.com/Richbanker/team-lead-lab/issues/new/choose) · [Открытые задачи](https://github.com/Richbanker/team-lead-lab/issues?q=is%3Aissue+is%3Aopen+label%3A%22team%3Atask%22) · [Журнал сводок](https://github.com/Richbanker/team-lead-lab/issues/1)
+Веду проект с аккаунта [`@Richbanker`](https://github.com/Richbanker) и отвечаю за результат от постановки задачи до приёмки.
+
+- **Ставлю задачи.** Определяю цель, распределяю работу через GitHub Issues и формулирую критерии приёмки.
+- **Проверяю pull requests.** Сверяю изменения с критериями, смотрю результаты тестов и оставляю замечания в ревью.
+- **Принимаю работу.** Фиксирую решение в PR и сливаю изменения после приёмки.
+
+[Цель проекта](https://github.com/Richbanker/team-lead-lab/issues/2) · [Поставить задачу](https://github.com/Richbanker/team-lead-lab/issues/new/choose) · [Открытые задачи](https://github.com/Richbanker/team-lead-lab/issues?q=is%3Aissue+is%3Aopen+label%3A%22team%3Atask%22) · [Pull requests](https://github.com/Richbanker/team-lead-lab/pulls) · [Журнал сводок](https://github.com/Richbanker/team-lead-lab/issues/1)
 
 ## Как вести работу
 
