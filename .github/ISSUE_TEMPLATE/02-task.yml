@@ -1,0 +1,46 @@
+name: Задача
+description: Поставить задачу исполнителю и задать критерии приёмки
+labels: ['team:task']
+body:
+  - type: input
+    id: goal
+    attributes:
+      label: Цель
+      description: Укажите номер или ссылку на родительский Issue.
+      placeholder: '#1'
+    validations:
+      required: true
+  - type: dropdown
+    id: role
+    attributes:
+      label: Роль исполнителя
+      options:
+        - Product
+        - UX
+        - Frontend
+        - Backend
+        - QA
+        - DevOps
+        - Docs
+        - Review
+    validations:
+      required: true
+  - type: textarea
+    id: deliverable
+    attributes:
+      label: Что нужно сделать
+      description: Опишите результат и границы задачи.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Критерии приёмки
+      description: Перечислите конкретные проверки, которые проведёт тимлид.
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Зависимости и материалы
+      description: Укажите связанные Issues, документы или решения, если они есть.

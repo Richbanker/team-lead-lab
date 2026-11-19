@@ -1,0 +1,34 @@
+name: Сводка по задачам
+
+on:
+  schedule:
+    - cron: '0 9 * * *'
+      timezone: 'Europe/Moscow'
+    - cron: '0 13 * * *'
+      timezone: 'Europe/Moscow'
+    - cron: '0 18 * * *'
+      timezone: 'Europe/Moscow'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+concurrency:
+  group: team-pulse
+  cancel-in-progress: false
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Опубликовать сводку
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          REPORT_SCHEDULE: ${{ github.event.schedule }}
+        run: python3 scripts/team_pulse.py

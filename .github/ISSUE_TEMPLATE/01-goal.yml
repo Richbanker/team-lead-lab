@@ -1,0 +1,23 @@
+name: Цель
+description: Зафиксировать результат команды и способ его измерения
+labels: ['team:goal']
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Ожидаемый результат
+      description: Что изменится и для кого?
+    validations:
+      required: true
+  - type: textarea
+    id: success
+    attributes:
+      label: Критерии достижения
+      description: Как проверим, что цель достигнута?
+    validations:
+      required: true
+  - type: input
+    id: deadline
+    attributes:
+      label: Срок
+      placeholder: ГГГГ-ММ-ДД
