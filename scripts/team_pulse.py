@@ -73,6 +73,7 @@ def task_status(issue):
         ("status:blocked", "Блокеры"),
         ("status:in-review", "На ревью"),
         ("status:in-progress", "В работе"),
+        ("status:ready", "Готовы к запуску"),
     ):
         if label in labels:
             return status
@@ -120,7 +121,7 @@ def render_report(github, now, heading):
     pulls = list(github.pages("pulls", state="open", sort="created", direction="asc"))
 
     groups = {status: [] for status in (
-        "Блокеры", "На ревью", "В работе", "Назначены", "Без исполнителя",
+        "Блокеры", "На ревью", "В работе", "Готовы к запуску", "Назначены", "Без исполнителя",
     )}
     for task in tasks:
         groups[task_status(task)].append(task)

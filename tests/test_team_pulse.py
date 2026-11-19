@@ -21,6 +21,7 @@ class ReportTests(TestCase):
         self.assertEqual(task_status(task), "Блокеры")
         self.assertEqual(task_status(issue(2, assignees=("Richbanker",))), "Назначены")
         self.assertEqual(task_status(issue(3)), "Без исполнителя")
+        self.assertEqual(task_status(issue(4, "status:ready")), "Готовы к запуску")
 
     def test_only_recent_completed_tasks_count_as_accepted(self):
         github = Mock(web="https://github.com/Richbanker/team-lead-lab")
