@@ -18,6 +18,12 @@ REPORT_SLOTS = {
     "": ("manual", "Сводка по запросу"),
 }
 ROW_LIMIT = 10
+TASK_STATUS_LABELS = (
+    ("status:blocked", "Блокеры"),
+    ("status:in-review", "На ревью"),
+    ("status:in-progress", "В работе"),
+    ("status:ready", "Готовы к запуску"),
+)
 
 
 class GitHub:
@@ -70,12 +76,7 @@ class GitHub:
 
 def task_status(issue):
     labels = {label["name"] for label in issue["labels"]}
-    for label, status in (
-        ("status:blocked", "Блокеры"),
-        ("status:in-review", "На ревью"),
-        ("status:in-progress", "В работе"),
-        ("status:ready", "Готовы к запуску"),
-    ):
+    for label, status in TASK_STATUS_LABELS:
         if label in labels:
             return status
     return "Назначены" if issue["assignees"] else "Без исполнителя"
@@ -97,14 +98,27 @@ def item_line(item, repo_url, kind):
     return f"- [#{number}]({repo_url}/{kind}/{number}) {title}{suffix}"
 
 
+def full_list_url(title, repo_url, kind):
+    if kind == "pull":
+        return f"{repo_url}/pulls"
+
+    filters = ["is:issue", "is:open", 'label:"team:task"']
+    for label, status in TASK_STATUS_LABELS:
+        qualifier = f'label:"{label}"'
+        if title == status:
+            query = urlencode({"q": " ".join([*filters, qualifier])})
+            return f"{repo_url}/issues?{query}"
+        filters.append(f"-{qualifier}")
+    return f"{repo_url}/issues"
+
+
 def section(title, items, repo_url, kind="issues"):
     rows = [f"### {title} ({len(items)})", ""]
     rows.extend(item_line(item, repo_url, kind) for item in items[:ROW_LIMIT])
     if not items:
         rows.append("—")
     if len(items) > ROW_LIMIT:
-        index = "pulls" if kind == "pull" else "issues"
-        rows.append(f"[Открыть полный список]({repo_url}/{index})")
+        rows.append(f"[Открыть полный список]({full_list_url(title, repo_url, kind)})")
     return "\n".join(rows)
 
 
