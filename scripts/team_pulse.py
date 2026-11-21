@@ -1,5 +1,6 @@
-"""Publish a GitHub Issues digest to the repository's reporting issue."""
+"""Preview or publish the repository's GitHub Issues digest."""
 
+import argparse
 from datetime import datetime, timedelta, timezone
 import html
 import json
@@ -7,7 +8,7 @@ import os
 import re
 from urllib.parse import urlencode, urlsplit
 from urllib.request import Request, urlopen
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
 REPORT_SLOTS = {
@@ -143,20 +144,36 @@ def render_report(github, now, heading):
     return "\n\n".join(sections) + "\n"
 
 
-def main():
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--preview", action="store_true", help="Print the Markdown digest to stdout.")
+    args = parser.parse_args(argv)
+
     github = GitHub(os.environ["GITHUB_REPOSITORY"], os.environ["GITHUB_TOKEN"])
-    now = datetime.now(ZoneInfo("Europe/Moscow")).replace(microsecond=0)
+    try:
+        report_timezone = ZoneInfo("Europe/Moscow")
+    except ZoneInfoNotFoundError:
+        report_timezone = timezone(timedelta(hours=3))
+    now = datetime.now(report_timezone).replace(microsecond=0)
     slot, heading = REPORT_SLOTS[os.environ.get("REPORT_SCHEDULE", "")]
     marker = f"<!-- team-pulse:{now:%Y-%m-%d}:{slot} -->"
-    overview = [
-        issue for issue in github.issues(state="open", labels="team:overview")
-        if issue["user"]["login"].lower() == github.owner
-    ]
-    if len(overview) != 1:
-        raise RuntimeError("Create exactly one open issue from the repository owner's account with label team:overview.")
+    issue_number = None
+    if not args.preview:
+        overview = [
+            issue for issue in github.issues(state="open", labels="team:overview")
+            if issue["user"]["login"].lower() == github.owner
+        ]
+        if len(overview) != 1:
+            raise RuntimeError("Create exactly one open issue from the repository owner's account with label team:overview.")
+        issue_number = overview[0]["number"]
+
     report = marker + "\n" + render_report(github, now, heading)
+    if issue_number is None:
+        print(report, end="")
+        return
+
     day_start = now.replace(hour=0, minute=0, second=0).astimezone(timezone.utc)
-    print(github.publish(overview[0]["number"], marker, report, day_start.strftime("%Y-%m-%dT%H:%M:%SZ")))
+    print(github.publish(issue_number, marker, report, day_start.strftime("%Y-%m-%dT%H:%M:%SZ")))
 
 
 if __name__ == "__main__":
