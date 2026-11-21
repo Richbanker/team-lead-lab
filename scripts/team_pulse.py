@@ -112,6 +112,11 @@ def render_report(github, now, heading):
     since = cutoff.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     goals = github.issues(state="open", labels="team:goal", sort="created", direction="asc")
     tasks = github.issues(state="open", labels="team:task", sort="created", direction="asc")
+    inactive_since = (now.astimezone(timezone.utc) - timedelta(hours=48)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    inactive_tasks = sorted(
+        (task for task in tasks if task["updated_at"] <= inactive_since),
+        key=lambda task: task["updated_at"],
+    )
     closed = github.issues(state="closed", labels="team:task", since=since)
     completed = sorted(
         (issue for issue in closed if issue["state_reason"] == "completed" and issue["closed_at"] >= since),
@@ -131,6 +136,7 @@ def render_report(github, now, heading):
         f"Открыто задач **{len(tasks)}** · принято за 24 часа **{len(completed)}** · открыто PR **{len(pulls)}**",
         section("Открытые цели", goals, github.web),
         *(section(status, issues, github.web) for status, issues in groups.items()),
+        section("Без движения 48 часов", inactive_tasks, github.web),
         section("Открытые PR", pulls, github.web, "pull"),
         section("Принято за 24 часа", completed, github.web),
     ]

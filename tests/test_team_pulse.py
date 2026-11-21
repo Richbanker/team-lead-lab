@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 from unittest import TestCase
 from unittest.mock import Mock
 
-from scripts.team_pulse import GitHub, markdown_text, render_report, task_status
+from scripts.team_pulse import ROW_LIMIT, GitHub, markdown_text, render_report, task_status
 
 
 def issue(number, *labels, assignees=(), **fields):
@@ -11,6 +11,7 @@ def issue(number, *labels, assignees=(), **fields):
         "title": f"Задача {number}",
         "labels": [{"name": label} for label in labels],
         "assignees": [{"login": login} for login in assignees],
+        "updated_at": "2026-11-19T10:00:00Z",
         **fields,
     }
 
@@ -46,6 +47,44 @@ class ReportTests(TestCase):
 
     def test_title_formatting_neutralizes_markup_and_mentions(self):
         self.assertEqual(markdown_text("@someone\n**wow** <img>"), r"&#64;someone \*\*wow\*\* &lt;img&gt;")
+
+    def test_inactive_tasks_include_exact_cutoff_and_show_oldest_first(self):
+        repo_url = "https://github.com/Richbanker/team-lead-lab"
+        github = Mock(web=repo_url)
+        github.issues.side_effect = [
+            [],
+            [
+                issue(1, updated_at="2026-11-17T10:00:01Z"),
+                issue(2, updated_at="2026-11-17T10:00:00Z", assignees=("Richbanker",)),
+                issue(3, updated_at="2026-11-17T09:59:59Z"),
+            ],
+            [],
+        ]
+        github.pages.return_value = []
+        midday = datetime(2026, 11, 19, 13, tzinfo=timezone(timedelta(hours=3)))
+        report = render_report(github, midday, "Обеденная сводка")
+        self.assertIn(
+            "### Без движения 48 часов (2)\n\n"
+            f"- [#3]({repo_url}/issues/3) Задача 3\n"
+            f"- [#2]({repo_url}/issues/2) Задача 2 · Richbanker\n\n"
+            "### Открытые PR",
+            report,
+        )
+
+    def test_inactive_section_limits_rows_but_shows_total(self):
+        repo_url = "https://github.com/Richbanker/team-lead-lab"
+        github = Mock(web=repo_url)
+        total = ROW_LIMIT + 1
+        tasks = [issue(number, updated_at="2026-11-17T09:00:00Z") for number in range(1, total + 1)]
+        github.issues.side_effect = [[], tasks, []]
+        github.pages.return_value = []
+        now = datetime(2026, 11, 19, 10, tzinfo=timezone.utc)
+        report = render_report(github, now, "Обеденная сводка")
+        heading = f"### Без движения 48 часов ({total})\n\n"
+        self.assertIn(heading, report)
+        inactive_section = report.partition(heading)[2].partition("\n\n### ")[0]
+        self.assertEqual(inactive_section.count(f"]({repo_url}/issues/"), ROW_LIMIT)
+        self.assertIn(f"[Открыть полный список]({repo_url}/issues)", inactive_section)
 
 
 class GitHubTests(TestCase):
