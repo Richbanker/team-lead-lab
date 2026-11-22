@@ -44,3 +44,9 @@ body:
     attributes:
       label: Зависимости и материалы
       description: Укажите связанные Issues, документы или решения, если они есть.
+  - type: input
+    id: due-date
+    attributes:
+      label: Срок
+      description: Укажите дату в формате ГГГГ-ММ-ДД по Москве, если у задачи есть срок.
+      placeholder: ГГГГ-ММ-ДД
