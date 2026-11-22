@@ -28,7 +28,11 @@ jobs:
         with:
           persist-credentials: false
       - name: Опубликовать сводку
+        shell: bash
         env:
           GITHUB_TOKEN: ${{ github.token }}
           REPORT_SCHEDULE: ${{ github.event.schedule }}
-        run: python3 scripts/team_pulse.py
+        run: |
+          report_url=$(python3 scripts/team_pulse.py)
+          printf '%s\n' "$report_url"
+          printf '[Открыть опубликованную сводку](%s)\n' "$report_url" >> "$GITHUB_STEP_SUMMARY"
