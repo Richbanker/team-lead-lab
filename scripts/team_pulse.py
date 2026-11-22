@@ -1,7 +1,7 @@
 """Preview or publish the repository's GitHub Issues digest."""
 
 import argparse
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 import html
 import json
 import os
@@ -82,6 +82,38 @@ def task_status(issue):
     return "Назначены" if issue["assignees"] else "Без исполнителя"
 
 
+def moscow_timezone():
+    try:
+        return ZoneInfo("Europe/Moscow")
+    except ZoneInfoNotFoundError:
+        return timezone(timedelta(hours=3))
+
+
+def task_due_date(body):
+    match = re.search(
+        r"^###?[ \t]+Срок[ \t]*\r?\n(?:[ \t]*\r?\n)*"
+        r"[ \t]*([0-9]{4}-[0-9]{2}-[0-9]{2})[ \t]*\r?$",
+        body or "",
+        re.MULTILINE,
+    )
+    if match is None:
+        return None
+    try:
+        return date.fromisoformat(match.group(1))
+    except ValueError:
+        return None
+
+
+def overdue_tasks(tasks, today):
+    overdue = []
+    for task in tasks:
+        deadline = task_due_date(task.get("body"))
+        if deadline is not None and deadline < today:
+            overdue.append((deadline, task))
+    overdue.sort(key=lambda entry: entry[0])
+    return [task for _, task in overdue]
+
+
 def markdown_text(value):
     value = " ".join(value.split())[:180]
     value = re.sub(r"([\\`*_{}\[\]()#+!|~])", r"\\\1", value)
@@ -146,11 +178,13 @@ def render_report(github, now, heading):
     for task in tasks:
         groups[task_status(task)].append(task)
 
+    today = now.astimezone(moscow_timezone()).date()
     sections = [
         f"## {heading} · {now:%d.%m.%Y %H:%M} МСК",
         f"Открыто задач **{len(tasks)}** · принято за 24 часа **{len(completed)}** · открыто PR **{len(pulls)}**",
         section("Открытые цели", goals, github.web),
         *(section(status, issues, github.web) for status, issues in groups.items()),
+        section("Просрочено", overdue_tasks(tasks, today), github.web),
         section("Без движения 48 часов", inactive_tasks, github.web),
         section("Открытые PR", pulls, github.web, "pull"),
         section("Принято за 24 часа", completed, github.web),
@@ -164,11 +198,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     github = GitHub(os.environ["GITHUB_REPOSITORY"], os.environ["GITHUB_TOKEN"])
-    try:
-        report_timezone = ZoneInfo("Europe/Moscow")
-    except ZoneInfoNotFoundError:
-        report_timezone = timezone(timedelta(hours=3))
-    now = datetime.now(report_timezone).replace(microsecond=0)
+    now = datetime.now(moscow_timezone()).replace(microsecond=0)
     slot, heading = REPORT_SLOTS[os.environ.get("REPORT_SCHEDULE", "")]
     marker = f"<!-- team-pulse:{now:%Y-%m-%d}:{slot} -->"
     issue_number = None
