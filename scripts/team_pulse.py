@@ -6,6 +6,8 @@ import html
 import json
 import os
 import re
+from time import sleep
+from urllib.error import HTTPError
 from urllib.parse import urlencode, urlsplit
 from urllib.request import Request, urlopen
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -18,6 +20,9 @@ REPORT_SLOTS = {
     "": ("manual", "Сводка по запросу"),
 }
 ROW_LIMIT = 10
+GET_MAX_ATTEMPTS = 3
+GET_RETRY_STATUS_CODES = (502, 503, 504)
+GET_RETRY_DELAY_SECONDS = 1
 TASK_STATUS_LABELS = (
     ("status:blocked", "Блокеры"),
     ("status:in-review", "На ревью"),
@@ -44,8 +49,16 @@ class GitHub:
     def request(self, url, method="GET", body=None):
         data = None if body is None else json.dumps(body).encode("utf-8")
         request = Request(url, data=data, method=method, headers=self.headers)
-        with urlopen(request, timeout=20) as response:
-            return json.load(response), response.headers.get("Link", "")
+        attempts = GET_MAX_ATTEMPTS if method == "GET" else 1
+        for attempt in range(1, attempts + 1):
+            try:
+                with urlopen(request, timeout=20) as response:
+                    return json.load(response), response.headers.get("Link", "")
+            except HTTPError as error:
+                if attempt == attempts or error.code not in GET_RETRY_STATUS_CODES:
+                    raise
+                error.close()
+                sleep(GET_RETRY_DELAY_SECONDS)
 
     def pages(self, path, **params):
         url = f"{self.api}/{path}?{urlencode({'per_page': 100, **params})}"
