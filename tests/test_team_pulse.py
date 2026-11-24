@@ -25,6 +25,34 @@ class ReportTests(TestCase):
         self.assertEqual(task_status(issue(3)), "Без исполнителя")
         self.assertEqual(task_status(issue(4, "status:ready")), "Готовы к запуску")
 
+    def test_attention_counts_follow_the_report_status_priority(self):
+        github = Mock(web="https://github.com/Richbanker/team-lead-lab")
+        tasks = [
+            issue(1, "status:in-review", "status:blocked"),
+            issue(2, "status:blocked"),
+            issue(3, "status:in-review"),
+            issue(4, "status:ready"),
+        ]
+        github.issues.side_effect = [[], tasks, []]
+        github.pages.return_value = []
+        now = datetime(2026, 11, 24, 13, tzinfo=timezone(timedelta(hours=3)))
+        report = render_report(github, now, "Сводка")
+
+        self.assertEqual(report.split("\n\n", 2)[1], "- Блокеры · **2**\n- На ревью · **1**")
+        self.assertIn("### Блокеры (2)", report)
+        self.assertIn("### На ревью (1)", report)
+
+    def test_attention_counts_show_zero_without_tasks(self):
+        github = Mock(web="https://github.com/Richbanker/team-lead-lab")
+        github.issues.return_value = []
+        github.pages.return_value = []
+        now = datetime(2026, 11, 24, 13, tzinfo=timezone(timedelta(hours=3)))
+        report = render_report(github, now, "Сводка")
+
+        self.assertEqual(report.split("\n\n", 2)[1], "- Блокеры · **0**\n- На ревью · **0**")
+        self.assertIn("### Блокеры (0)", report)
+        self.assertIn("### На ревью (0)", report)
+
     def test_only_recent_completed_tasks_count_as_accepted(self):
         github = Mock(web="https://github.com/Richbanker/team-lead-lab")
         github.issues.side_effect = [
