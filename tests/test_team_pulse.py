@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from unittest import TestCase
-from unittest.mock import Mock
+from unittest.mock import Mock, call
+from urllib.parse import urlencode
 
 from scripts.team_pulse import ROW_LIMIT, GitHub, markdown_text, render_report, task_status
 
@@ -111,3 +112,58 @@ class GitHubTests(TestCase):
         self.assertTrue(report_url.endswith("#issuecomment-2"))
         self.github.pages.assert_called_once_with("issues/1/comments", since=day_start)
         self.github.request.assert_called_once_with(f"{self.github.api}/issues/comments/2", "PATCH", {"body": body})
+
+
+class GitHubPublishTests(TestCase):
+    def setUp(self):
+        self.github = GitHub("Richbanker/team-lead-lab", "test-token")
+        self.github.request = Mock()
+        self.marker = "<!-- team-pulse:2026-11-23:morning -->"
+        self.report = f"{self.marker}\nУтренняя сводка"
+        self.day_start = "2026-11-22T21:00:00Z"
+        self.comments_url = f"{self.github.api}/issues/1/comments"
+        query = urlencode({"per_page": 100, "since": self.day_start})
+        self.read_comments = call(f"{self.comments_url}?{query}")
+        self.comment_url = "https://github.com/Richbanker/team-lead-lab/issues/1#issuecomment-2"
+
+    def test_first_publication_posts_once_and_returns_the_new_url(self):
+        self.github.request.side_effect = [([], ""), ({"html_url": self.comment_url}, "")]
+
+        url = self.github.publish(1, self.marker, self.report, self.day_start)
+
+        self.assertEqual(url, self.comment_url)
+        self.assertEqual(self.github.request.call_args_list, [
+            self.read_comments,
+            call(self.comments_url, "POST", {"body": self.report}),
+        ])
+
+    def test_unchanged_report_reuses_the_existing_url_without_writing(self):
+        comment = {
+            "id": 2,
+            "user": {"login": "github-actions[bot]"},
+            "body": self.report,
+            "html_url": self.comment_url,
+        }
+        self.github.request.return_value = ([comment], "")
+
+        url = self.github.publish(1, self.marker, self.report, self.day_start)
+
+        self.assertEqual(url, self.comment_url)
+        self.assertEqual(self.github.request.call_args_list, [self.read_comments])
+
+    def test_comment_from_another_window_is_preserved(self):
+        comment = {
+            "id": 1,
+            "user": {"login": "github-actions[bot]"},
+            "body": "<!-- team-pulse:2026-11-23:noon -->\nОбеденная сводка",
+            "html_url": "https://github.com/Richbanker/team-lead-lab/issues/1#issuecomment-1",
+        }
+        self.github.request.side_effect = [([comment], ""), ({"html_url": self.comment_url}, "")]
+
+        url = self.github.publish(1, self.marker, self.report, self.day_start)
+
+        self.assertEqual(url, self.comment_url)
+        self.assertEqual(self.github.request.call_args_list, [
+            self.read_comments,
+            call(self.comments_url, "POST", {"body": self.report}),
+        ])
