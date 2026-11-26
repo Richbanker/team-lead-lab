@@ -18,6 +18,17 @@ def issue(number, *labels, assignees=(), **fields):
 
 
 class ReportTests(TestCase):
+    def assert_attention_links(self, report, repo, blockers, review):
+        filters = 'is:issue is:open label:"team:task"'
+        blocker_query = urlencode({"q": f'{filters} label:"status:blocked"'})
+        review_query = urlencode({"q": f'{filters} -label:"status:blocked" label:"status:in-review"'})
+        self.assertEqual(
+            report.split("\n\n", 2)[1],
+            f"- [Блокеры · **{blockers}**]({repo}/issues?{blocker_query})\n"
+            f"- [На ревью · **{review}**]({repo}/issues?{review_query})\n"
+            f"- [История запусков]({repo}/actions/workflows/team-pulse.yml)",
+        )
+
     def test_blockers_take_precedence_when_labels_overlap(self):
         task = issue(1, "status:in-review", "status:blocked", assignees=("Richbanker",))
         self.assertEqual(task_status(task), "Блокеры")
@@ -38,18 +49,18 @@ class ReportTests(TestCase):
         now = datetime(2026, 11, 24, 13, tzinfo=timezone(timedelta(hours=3)))
         report = render_report(github, now, "Сводка")
 
-        self.assertEqual(report.split("\n\n", 2)[1], "- Блокеры · **2**\n- На ревью · **1**")
+        self.assert_attention_links(report, github.web, 2, 1)
         self.assertIn("### Блокеры (2)", report)
         self.assertIn("### На ревью (1)", report)
 
     def test_attention_counts_show_zero_without_tasks(self):
-        github = Mock(web="https://github.com/Richbanker/team-lead-lab")
+        github = Mock(web="https://github.com/example/other-project")
         github.issues.return_value = []
         github.pages.return_value = []
         now = datetime(2026, 11, 24, 13, tzinfo=timezone(timedelta(hours=3)))
         report = render_report(github, now, "Сводка")
 
-        self.assertEqual(report.split("\n\n", 2)[1], "- Блокеры · **0**\n- На ревью · **0**")
+        self.assert_attention_links(report, github.web, 0, 0)
         self.assertIn("### Блокеры (0)", report)
         self.assertIn("### На ревью (0)", report)
 

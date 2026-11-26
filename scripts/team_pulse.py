@@ -191,11 +191,16 @@ def render_report(github, now, heading):
     for task in tasks:
         groups[task_status(task)].append(task)
 
+    attention = [
+        f"- [{status} · **{len(groups[status])}**]({full_list_url(status, github.web, 'issues')})"
+        for status in ("Блокеры", "На ревью")
+    ]
+    attention.append(f"- [История запусков]({github.web}/actions/workflows/team-pulse.yml)")
+
     today = now.astimezone(moscow_timezone()).date()
     sections = [
         f"## {heading} · {now:%d.%m.%Y %H:%M} МСК",
-        f"- Блокеры · **{len(groups['Блокеры'])}**\n"
-        f"- На ревью · **{len(groups['На ревью'])}**",
+        "\n".join(attention),
         f"Открыто задач **{len(tasks)}** · принято за 24 часа **{len(completed)}** · открыто PR **{len(pulls)}**",
         section("Открытые цели", goals, github.web),
         *(section(status, issues, github.web) for status, issues in groups.items()),
