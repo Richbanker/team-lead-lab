@@ -212,9 +212,14 @@ def main(argv=None):
     parser.add_argument("--preview", action="store_true", help="Print the Markdown digest to stdout.")
     args = parser.parse_args(argv)
 
+    schedule = os.environ.get("REPORT_SCHEDULE", "")
+    if schedule not in REPORT_SLOTS:
+        parser.error(f"Неизвестное значение REPORT_SCHEDULE {schedule!r}. "
+                     "Сверьте расписание в .github/workflows/team-pulse.yml.")
+    slot, heading = REPORT_SLOTS[schedule]
+
     github = GitHub(os.environ["GITHUB_REPOSITORY"], os.environ["GITHUB_TOKEN"])
     now = datetime.now(moscow_timezone()).replace(microsecond=0)
-    slot, heading = REPORT_SLOTS[os.environ.get("REPORT_SCHEDULE", "")]
     marker = f"<!-- team-pulse:{now:%Y-%m-%d}:{slot} -->"
     issue_number = None
     if not args.preview:

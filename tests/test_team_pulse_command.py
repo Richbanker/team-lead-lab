@@ -1,4 +1,4 @@
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime, timedelta, timezone
 from io import StringIO
 from unittest import TestCase
@@ -9,10 +9,12 @@ from scripts.team_pulse import main
 
 
 class ReportCommandTests(TestCase):
-    def run_main(self, github, args, *, timezone_available=True):
+    def run_main(self, github, args, *, timezone_available=True, schedule=None):
         moscow = timezone(timedelta(hours=3))
         now = datetime(2026, 11, 20, 9, tzinfo=moscow)
         env = {"GITHUB_REPOSITORY": "Richbanker/team-lead-lab", "GITHUB_TOKEN": "test-token"}
+        if schedule is not None:
+            env["REPORT_SCHEDULE"] = schedule
         output = StringIO()
         with (
             patch.dict("os.environ", env, clear=True),
@@ -27,6 +29,41 @@ class ReportCommandTests(TestCase):
             main(args)
             clock.now.assert_called_once_with(moscow)
         return output.getvalue()
+
+    def test_unknown_schedule_fails_before_connecting_to_github(self):
+        output = StringIO()
+        errors = StringIO()
+        with (
+            patch.dict("os.environ", {"REPORT_SCHEDULE": "0 7 * * *"}, clear=True),
+            patch("scripts.team_pulse.GitHub") as github,
+            redirect_stdout(output),
+            redirect_stderr(errors),
+            self.assertRaises(SystemExit) as failure,
+        ):
+            main([])
+
+        self.assertNotEqual(failure.exception.code, 0)
+        self.assertEqual(output.getvalue(), "")
+        self.assertIn("REPORT_SCHEDULE '0 7 * * *'", errors.getvalue())
+        self.assertIn(".github/workflows/team-pulse.yml", errors.getvalue())
+        github.assert_not_called()
+
+    def test_known_schedules_and_explicit_manual_window(self):
+        windows = (
+            ("0 9 * * *", "morning", "Утренняя сводка"),
+            ("0 13 * * *", "noon", "Обеденная сводка"),
+            ("0 18 * * *", "evening", "Вечерняя сводка"),
+            ("", "manual", "Сводка по запросу"),
+        )
+        for schedule, slot, heading in windows:
+            with self.subTest(schedule=schedule):
+                github = Mock(web="https://github.com/Richbanker/team-lead-lab")
+                github.issues.side_effect = [[], [], []]
+                github.pages.return_value = []
+                output = self.run_main(github, ["--preview"], schedule=schedule)
+                self.assertTrue(output.startswith(f"<!-- team-pulse:2026-11-20:{slot} -->\n"))
+                self.assertIn(f"## {heading}", output)
+                github.publish.assert_not_called()
 
     def test_preview_prints_markdown_without_reporting_issue_or_publication(self):
         github = Mock(web="https://github.com/Richbanker/team-lead-lab")
